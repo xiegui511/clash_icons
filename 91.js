@@ -1,96 +1,181 @@
-// 91Porn TVBox 源脚本
-const BASE_URL = "https://p06.rocks"; // 请替换为你能访问的镜像地址
+//@name:91Porn视频源
+//@webSite:https://91porn.com
+//@version:1
+//@remark:91Porn视频源扩展模板
+//@codeID:
+//@env:
+//@isAV:1
+//@deprecated:0
 
-function home() {
-  return JSON.stringify({
-    class: [
-      { type_id: "rf", type_name: "最近更新" },
-      { type_id: "hot", type_name: "当前最热" },
-      { type_id: "top", type_name: "本月最热" },
-      { type_id: "mf", type_name: "本月收藏" }
-    ]
-  });
+import {
+    FilterLabel,
+    FilterTitle,
+    VideoClass,
+    VideoSubclass,
+    VideoDetail,
+    RepVideoClassList,
+    RepVideoSubclassList,
+    RepVideoList,
+    RepVideoDetail,
+    RepVideoPlayUrl,
+    UZArgs,
+    UZSubclassVideoListArgs,
+} from '../core/uzVideo.js'
+
+import {
+    UZUtils,
+    ProData,
+    ReqResponseType,
+    ReqAddressType,
+    req,
+    getEnv,
+    setEnv,
+    goToVerify,
+    openWebToBindEnv,
+    toast,
+    kIsDesktop,
+    kIsAndroid,
+    kIsIOS,
+    kIsWindows,
+    kIsMacOS,
+    kIsTV,
+    kLocale,
+    kAppVersion,
+    formatBackData,
+} from '../core/uzUtils.js'
+
+import { cheerio, Crypto, Encrypt, JSONbig } from '../core/uz3lib.js'
+
+const appConfig = {
+    _webSite: '',
+    get webSite() {
+        return this._webSite
+    },
+    set webSite(value) {
+        this._webSite = value
+    },
+
+    _uzTag: '',
+    get uzTag() {
+        return this._uzTag
+    },
+    set uzTag(value) {
+        this._uzTag = value
+    },
 }
 
-function homeVod(params) {
-  const cate = params.type || "rf";
-  const pg = params.page || 1;
-  const url = `${BASE_URL}/v.php?category=${cate}&viewtype=basic&page=${pg}`;
-  const html = request(url, { headers: { Cookie: "language=cn_CN" } });
-
-  const list = [];
-  const reg = /<div class="listchannel">([\s\S]*?)<\/div>\s*<\/div>/g;
-  while (true) {
-    const m = reg.exec(html);
-    if (!m) break;
-    const block = m[1];
-    list.push({
-      vod_id: block.match(/href="([^"]*view_video.php\?viewkey=[^"]+)"/)?.[1] || "",
-      vod_name: block.match(/title="([^"]+)"/)?.[1] || "No Title",
-      vod_pic: (block.match(/src="([^"]+)"/)?.[1] || "").replace(/^\/\//, "https://"),
-      vod_remarks: (block.match(/时长:<\/span>([^<]+)/)?.[1] || "").trim()
-    });
-  }
-
-  return JSON.stringify({
-    page: pg,
-    pagecount: list.length === 0 ? 0 : pg + 1,
-    list
-  });
+/**
+ * 异步获取分类列表的方法。
+ * @param {UZArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoClassList())>}
+ */
+async function getClassList(args) {
+    var backData = new RepVideoClassList()
+    try {
+        // TODO: 请求91Porn主页，解析分类列表并填充backData.classList
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
 }
 
-function search(params) {
-  const wd = params.wd || "";
-  const url = `${BASE_URL}/search_result.php?search_type=search_videos&keyword=${encodeURIComponent(wd)}`;
-  const html = request(url, { headers: { Cookie: "language=cn_CN" } });
-
-  const list = [];
-  const reg = /<div class="listchannel">([\s\S]*?)<\/div>\s*<\/div>/g;
-  while (true) {
-    const m = reg.exec(html);
-    if (!m) break;
-    const block = m[1];
-    list.push({
-      vod_id: block.match(/href="([^"]*view_video.php\?viewkey=[^"]+)"/)?.[1] || "",
-      vod_name: block.match(/title="([^"]+)"/)?.[1] || "No Title",
-      vod_pic: (block.match(/src="([^"]+)"/)?.[1] || "").replace(/^\/\//, "https://"),
-      vod_remarks: (block.match(/时长:<\/span>([^<]+)/)?.[1] || "").trim()
-    });
-  }
-  return JSON.stringify({ list });
+/**
+ * 获取二级分类列表筛选列表的方法。
+ * @param {UZArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoSubclassList())>}
+ */
+async function getSubclassList(args) {
+    var backData = new RepVideoSubclassList()
+    try {
+        // TODO: 91Porn一般无明显二级分类，可按需要实现筛选标签
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
 }
 
-function detail(params) {
-  const pageUrl = params.id.startsWith("http") ? params.id :
-    `${BASE_URL}/${params.id}`;
-  const html = request(pageUrl, { headers: { Cookie: "language=cn_CN" } });
-
-  const title = html.match(/<title>([^<]+)<\/title>/)?.[1] || "91 Video";
-  const pic = html.match(/poster="([^"]+)"/)?.[1] || "";
-  const playUrl = html.match(/source src="([^"]+)"/)?.[1] ||
-    html.match(/<iframe[^>]+src="([^"]+)"/)?.[1] || "";
-
-  const vod_play_url = playUrl
-    ? `在线播放$${playUrl}`
-    : "";
-
-  return JSON.stringify({
-    list: [
-      {
-        vod_id: pageUrl,
-        vod_name: title,
-        vod_pic: pic.replace(/^\/\//, "https://"),
-        type_name: "91Porn",
-        vod_play_from: "在线播放",
-        vod_play_url
-      }
-    ]
-  });
+/**
+ * 获取分类视频列表
+ * @param {UZArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoList())>}
+ */
+async function getVideoList(args) {
+    var backData = new RepVideoList()
+    try {
+        // TODO: 根据分类ID和分页参数请求列表，解析视频列表填充backData.videoList
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
 }
 
-function play(params) {
-  return JSON.stringify({
-    parse: 0,
-    url: params.url
-  });
+/**
+ * 获取二级分类视频列表 或 筛选视频列表
+ * @param {UZSubclassVideoListArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoList())>}
+ */
+async function getSubclassVideoList(args) {
+    var backData = new RepVideoList()
+    try {
+        // TODO: 根据筛选参数请求对应视频列表，复用getVideoList逻辑
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
+}
+
+/**
+ * 获取视频详情
+ * @param {UZArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoDetail())>}
+ */
+async function getVideoDetail(args) {
+    var backData = new RepVideoDetail()
+    try {
+        // TODO: 根据视频ID请求详情页，解析视频标题、简介、时长、封面、演员等信息
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
+}
+
+/**
+ * 获取视频的播放地址
+ * @param {UZArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoPlayUrl())>}
+ */
+async function getVideoPlayUrl(args) {
+    var backData = new RepVideoPlayUrl()
+    try {
+        // TODO: 获取视频播放页地址，解析或解密真实播放URL，支持多清晰度
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
+}
+
+/**
+ * 搜索视频
+ * @param {UZArgs} args
+ * @returns {@Promise<JSON.stringify(new RepVideoList())>}
+ */
+async function searchVideo(args) {
+    var backData = new RepVideoList()
+    try {
+        // TODO: 根据关键词请求搜索接口或搜索页，解析视频列表结果
+    } catch (error) {
+        backData.error = error.toString()
+    }
+    return JSON.stringify(backData)
+}
+
+export {
+    appConfig,
+    getClassList,
+    getSubclassList,
+    getVideoList,
+    getSubclassVideoList,
+    getVideoDetail,
+    getVideoPlayUrl,
+    searchVideo,
 }
