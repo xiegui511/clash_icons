@@ -4,5 +4,5 @@
   "webSite": "https://91porn.com",
   "remark": "91Porn 扩展，基于 JS 脚本解析",
   "version": "1",
-  "type": 3
+  "type": 100
 }
